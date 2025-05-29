@@ -138,7 +138,7 @@ func initDB() (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	db, err := sql.Open("sqlite", "./data/pocket-id-analytics.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(2500)&_txlock=immediate")
+	db, err := sql.Open("sqlite", "./data/pocket-id-analytics.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
