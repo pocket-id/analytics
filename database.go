@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"os"
@@ -19,49 +20,48 @@ type InstancesHistory struct {
 	Count int    `json:"count"`
 }
 
-func UpsertInstance(db *sql.DB, instanceID, version string) error {
+func UpsertInstance(parentCtx context.Context, db *sql.DB, instanceID, version string) error {
 	now := time.Now()
 
-	// Check if instance exists
-	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM instances WHERE id = ?)", instanceID).Scan(&exists)
-	if err != nil {
-		return err
-	}
+	// Upsert the instance
+	const query = `
+	INSERT INTO instances (id, first_seen, last_seen, latest_version)
+	VALUES (?, ?, ?, ?)
+	ON CONFLICT(id) DO UPDATE SET
+		last_seen = excluded.last_seen,
+		latest_version = excluded.latest_version
+	`
 
-	if exists {
-		// Update existing instance
-		_, err = db.Exec(
-			"UPDATE instances SET last_seen = ?, latest_version = ? WHERE id = ?",
-			now, version, instanceID,
-		)
-	} else {
-		// Insert new instance
-		_, err = db.Exec(
-			"INSERT INTO instances (id, first_seen, last_seen, latest_version) VALUES (?, ?, ?, ?)",
-			instanceID, now, now, version,
-		)
-	}
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	_, err := db.ExecContext(
+		ctx,
+		query,
+		instanceID, now, now, version,
+	)
 
 	return err
 }
 
-func GetTotalInstances(db *sql.DB) (int, error) {
-	var count int
+func GetTotalInstances(parentCtx context.Context, db *sql.DB) (int, error) {
 	// Only count instances that:
 	// 1. Are older than 1 day
 	// 2. Have been active in the last 2 days
-	query := `
-		SELECT COUNT(*) 
-		FROM instances 
-		WHERE first_seen < datetime('now', '-1 day') 
-		AND last_seen >= datetime('now', '-2 days')
+	const query = `
+	SELECT COUNT(*) 
+	FROM instances 
+	WHERE first_seen < datetime('now', '-1 day') 
+	AND last_seen >= datetime('now', '-2 days')
 	`
-	err := db.QueryRow(query).Scan(&count)
+
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	var count int
+	err := db.QueryRowContext(ctx, query).Scan(&count)
 	return count, err
 }
 
-func GetInstancesOverTime(db *sql.DB, timeframe string) ([]InstancesHistory, error) {
+func GetInstancesOverTime(parentCtx context.Context, db *sql.DB, timeframe string) ([]InstancesHistory, error) {
 	var query string
 
 	switch timeframe {
@@ -106,13 +106,15 @@ func GetInstancesOverTime(db *sql.DB, timeframe string) ([]InstancesHistory, err
 		return nil, fmt.Errorf("invalid timeframe: %s. Use 'daily' or 'monthly'", timeframe)
 	}
 
-	rows, err := db.Query(query)
+	ctx, cancel := context.WithTimeout(parentCtx, 10*time.Second)
+	defer cancel()
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var chartData []InstancesHistory
+	chartData := make([]InstancesHistory, 0, 36)
 	for rows.Next() {
 		var date string
 		var newCount, cumulativeCount int
@@ -136,7 +138,7 @@ func initDB() (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to create data directory: %w", err)
 	}
 
-	db, err := sql.Open("sqlite", "./data/pocket-id-analytics.db")
+	db, err := sql.Open("sqlite", "./data/pocket-id-analytics.db?_pragma=journal_mode(WAL)&_pragma=busy_timeout(2500)&_txlock=immediate")
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +151,7 @@ func initDB() (*sql.DB, error) {
         last_seen DATETIME NOT NULL,
         latest_version TEXT NOT NULL
     );
-    
+
     CREATE INDEX IF NOT EXISTS idx_first_seen ON instances(first_seen);
     CREATE INDEX IF NOT EXISTS idx_last_seen ON instances(last_seen);
     `

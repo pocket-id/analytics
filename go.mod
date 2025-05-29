@@ -2,9 +2,7 @@ module github.com/pocket-id/analytics
 
 go 1.24.1
 
-require (
-	github.com/glebarez/go-sqlite v1.22.0
-)
+require github.com/glebarez/go-sqlite v1.22.0
 
 require (
 	github.com/dustin/go-humanize v1.0.1 // indirect

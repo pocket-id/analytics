@@ -15,19 +15,19 @@ func main() {
 	defer db.Close()
 
 	// Set up HTTP handlers
-	http.HandleFunc("/heartbeat", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+	http.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	http.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	http.HandleFunc("POST /heartbeat", func(w http.ResponseWriter, r *http.Request) {
 		HeartbeatHandler(db)(w, r)
 	})
 
-	http.HandleFunc("/stats", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
+	http.HandleFunc("GET /stats", func(w http.ResponseWriter, r *http.Request) {
 		StatsHandler(db)(w, r)
 	})
 

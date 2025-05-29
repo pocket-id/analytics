@@ -17,11 +17,6 @@ type HeartbeatRequest struct {
 
 func HeartbeatHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
 		var req HeartbeatRequest
 		err := json.NewDecoder(r.Body).Decode(&req)
 		if err != nil {
@@ -43,7 +38,7 @@ func HeartbeatHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Store/update instance
-		err = UpsertInstance(db, req.InstanceID, req.Version)
+		err = UpsertInstance(r.Context(), db, req.InstanceID, req.Version)
 		if err != nil {
 			log.Printf("Error upserting instance: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -69,11 +64,6 @@ func StatsHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if r.Method != http.MethodGet {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
 		timeframe := r.URL.Query().Get("timeframe")
 		if timeframe != "daily" && timeframe != "monthly" {
 			timeframe = "daily"
@@ -89,14 +79,14 @@ func StatsHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Cache miss, fetch fresh data
-		totalInstances, err := GetTotalInstances(db)
+		totalInstances, err := GetTotalInstances(r.Context(), db)
 		if err != nil {
 			log.Printf("Error getting total instances: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
-		chartData, err := GetInstancesOverTime(db, timeframe)
+		chartData, err := GetInstancesOverTime(r.Context(), db, timeframe)
 		if err != nil {
 			log.Printf("Error getting chart data: %v", err)
 			http.Error(w, "Internal server error", http.StatusInternalServerError)
