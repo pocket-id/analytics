@@ -26,7 +26,7 @@ The server stores only the following information:
 
 ## API Endpoints
 
-This server is hostet at `https://analytics.pocket-id.org`.
+This server is hosted at `https://analytics.pocket-id.org`.
 
 ### Get Statistics
 
