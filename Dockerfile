@@ -1,4 +1,4 @@
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 
 WORKDIR /app
 
@@ -12,8 +12,10 @@ COPY . .
 RUN CGO_ENABLED=0 go build -o pocket-id-analytics --tags timetzdata .
 
 
-FROM gcr.io/distroless/base
+FROM gcr.io/distroless/static-debian13
 WORKDIR /app
+
+VOLUME [ "/app/data" ]
 
 COPY --from=builder /app/pocket-id-analytics ./pocket-id-analytics
 

@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	_ "github.com/glebarez/go-sqlite"
+	_ "modernc.org/sqlite"
 )
 
 type InstancesStats struct {
